@@ -5,7 +5,16 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract DegenGamingToken is ERC20, Ownable {
-    constructor() ERC20("DegenGamingToken", "DGT") Ownable(msg.sender) {}
+    mapping(uint256 => uint256) public itemPrices; // Mapping of item IDs to their prices
+
+    constructor() ERC20("DegenGamingToken", "DGT") Ownable(msg.sender) {
+        // Define the prices of items in the constructor
+        itemPrices[1] = 100; // Item with ID 1 costs 100 DGT tokens
+        itemPrices[2] = 200; // Item with ID 2 costs 200 DGT tokens
+        // Add more items and their prices as needed
+    }
+        // Mapping to keep track of claimed items by address
+mapping(address => mapping(uint256 => bool)) public claimedItems;
 
     // Mint new tokens. Only the owner can call this function.
     function mint(address to, uint256 amount) external onlyOwner {
@@ -17,16 +26,22 @@ contract DegenGamingToken is ERC20, Ownable {
         _transfer(msg.sender, to, amount);
     }
 
-    // Redeem tokens for items in the in-game store.
-    function redeem(address player, uint256 amount) external {
-        require(amount > 0, "Amount must be greater than zero");
-        require(balanceOf(player) >= amount, "Insufficient balance for redemption");
+// Redeem tokens for items in the in-game store.
+function redeem(uint256 itemId) external {
+    address player = msg.sender; // Set player to the address of the caller
+    require(itemPrices[itemId] > 0, "Invalid item ID"); // Check if the item ID is valid
+    require(balanceOf(player) >= itemPrices[itemId], "Insufficient balance for redemption");
+    require(!claimedItems[player][itemId], "Item already claimed");
 
-        // Add specific logic for redemption (e.g., updating in-game store items, etc.).
+    // Add specific logic for redemption based on the itemId (e.g., granting items to the player, updating in-game store items, etc.).
 
-        // Subtract redeemed tokens from player's balance
-        _burn(player, amount);
-    }
+    // Mark the item as claimed for the player
+    claimedItems[player][itemId] = true;
+
+    // Subtract redeemed tokens from player's balance
+    _burn(player, itemPrices[itemId]);
+}
+
 
     // Check token balance of a specific address.
     function checkBalance(address account) external view returns (uint256) {
