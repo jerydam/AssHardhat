@@ -1,68 +1,73 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract DegenGamingToken is ERC20, Ownable {
-    mapping(uint256 => uint256) public itemPrices; // Mapping of item IDs to their prices
-    mapping(uint256 => string) public itemNames; // Mapping of item IDs to their names
+contract DegenToken is ERC20, Ownable {
+    // Mapping of token balances for each address
+    mapping(address => uint256) private _balances;
 
-    constructor() ERC20("DegenGamingToken", "DGT") Ownable(msg.sender) {
-        // Define the prices and names of items in the constructor
-        itemPrices[1] = 100; // Item with ID 1 costs 100 DGT tokens
-        itemNames[1] = "Sword"; // Item with ID 1 is a Sword
-        itemPrices[2] = 200; // Item with ID 2 costs 200 DGT tokens
-        itemNames[2] = "Shield"; // Item with ID 2 is a Shield
-        // Add more items and their prices as needed
+    // Address of the in-game store
+    address public inGameStore;
+
+    // Event to track token burn
+    event Burn(address indexed burner, uint256 amount);
+
+    // Modifiers to check if the in-game store is set
+    modifier onlyInGameStore() {
+        require(inGameStore != address(0), "In-game store address not set");
+        _;
     }
 
-    // Mapping to keep track of claimed items by address
-    mapping(address => mapping(uint256 => bool)) public claimedItems;
+    constructor(string memory name, string memory symbol) ERC20(name, symbol) {}
 
-    // Mint new tokens. Only the owner can call this function.
-    function mint(address to, uint256 amount) external onlyOwner {
-        _mint(to, amount);
+    // Function to mint new tokens (onlyOwner)
+    function mint(address account, uint256 amount) public onlyOwner {
+        _mint(account, amount);
     }
 
-    // Transfer tokens to another address.
-    function transferTokens(address to, uint256 amount) external {
-        _transfer(msg.sender, to, amount);
+    // Function to transfer tokens
+    function transfer(address recipient, uint256 amount) public virtual override returns (bool) {
+        _transfer(_msgSender(), recipient, amount);
+        return true;
     }
 
-    // Redeem tokens for items in the in-game store.
-    function redeem(uint256 itemId) external {
-        address player = msg.sender; // Set player to the address of the caller
-        require(itemPrices[itemId] > 0, "Invalid item ID"); // Check if the item ID is valid
-        require(balanceOf(player) >= itemPrices[itemId], "Insufficient balance for redemption");
-        require(!claimedItems[player][itemId], "Item already claimed");
-
-        // Add specific logic for redemption based on the itemId (e.g., granting items to the player, updating in-game store items, etc.).
-
-        // Mark the item as claimed for the player
-        claimedItems[player][itemId] = true;
-
-        // Subtract redeemed tokens from player's balance
-        _burn(player, itemPrices[itemId]);
+    // Function to redeem tokens for items in the in-game store
+    function redeem(address recipient, uint256 amount) public onlyInGameStore returns (bool) {
+        _transfer(_msgSender(), recipient, amount);
+        return true;
     }
 
-    // Check token balance of a specific address.
-    function checkBalance(address account) external view returns (uint256) {
-        return balanceOf(account);
+    // Function to check token balance of an address
+    function balanceOf(address account) public view virtual override returns (uint256) {
+        return _balances[account];
     }
 
-    // Burn tokens. Anyone can burn their own tokens.
-    function burn(uint256 amount) external {
-        _burn(msg.sender, amount);
+    // Function to burn tokens
+    function burn(uint256 amount) public virtual {
+        _burn(_msgSender(), amount);
+        emit Burn(_msgSender(), amount);
     }
 
-    // Add new items to the in-game store
-    function addItem(uint256 itemId, uint256 price, string memory name) external onlyOwner {
-        require(itemId > 0, "Invalid item ID");
-        require(price > 0, "Invalid price");
-        require(bytes(name).length > 0, "Invalid name");
-
-        itemPrices[itemId] = price;
-        itemNames[itemId] = name;
+    // Function to set the address of the in-game store (onlyOwner)
+    function setInGameStore(address _inGameStore) public onlyOwner {
+        inGameStore = _inGameStore;
     }
+
+    // Internal function to transfer tokens
+    function _transfer(address sender, address recipient, uint256 amount) internal virtual override {
+        require(sender != address(0), "ERC20: transfer from the zero address");
+        require(recipient != address(0), "ERC20: transfer to the zero address");
+
+        _beforeTokenTransfer(sender, recipient, amount);
+
+        uint256 senderBalance = _balances[sender];
+        require(senderBalance >= amount, "ERC20: transfer amount exceeds balance");
+        _balances[sender] = senderBalance - amount;
+        _balances[recipient] += amount;
+
+        emit Transfer(sender, recipient, amount);
+    }
+
 }
